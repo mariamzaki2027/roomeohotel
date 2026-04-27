@@ -1,81 +1,70 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 
 function Navbar() {
-  const user = JSON.parse(localStorage.getItem("user"));
+  const navigate = useNavigate();
+  const [user, setUser] = useState(null);
+
+  // ✅ Sync user from localStorage
+  useEffect(() => {
+    const storedUser = JSON.parse(localStorage.getItem("user"));
+    setUser(storedUser);
+  }, []);
+
+  // ✅ LOGOUT FIX (NO reload)
+  const handleLogout = () => {
+    localStorage.removeItem("user");
+    localStorage.removeItem("userToken"); // 🔥 important
+    setUser(null);
+    navigate("/login");
+  };
 
   return (
-    <div
-      style={{
-        background: "#4E598C",
-        color: "white",
-        padding: "15px 30px",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-      }}
-    >
+    <div className="bg-[#4E598C] text-white px-6 py-4 flex justify-between items-center">
+
       {/* LOGO */}
-      <h2 style={{ fontWeight: "bold" }}>ROOMEO</h2>
+      <h2 className="font-bold text-xl cursor-pointer" onClick={() => navigate("/")}>
+        ROOMEO
+      </h2>
 
       {/* LINKS */}
-      <div style={{ display: "flex", alignItems: "center", gap: "25px" }}>
-        <Link to="/" style={linkStyle}>Home</Link>
-        <Link to="/rooms" style={linkStyle}>Rooms</Link>
-        <Link to="/booking" style={linkStyle}>Booking</Link>
+      <div className="flex items-center gap-6">
+
+        <Link to="/" className="hover:underline">
+          Home
+        </Link>
+
+        <Link to="/rooms" className="hover:underline">
+          Rooms
+        </Link>
 
         {/* USER SECTION */}
         {user ? (
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <span style={{ fontWeight: "bold" }}>
+          <div className="flex items-center gap-3">
+
+            <span className="font-semibold">
               Hi, {user.name}
             </span>
 
             <button
-              onClick={() => {
-                localStorage.removeItem("user");
-                window.location.reload();
-              }}
-              style={logoutBtn}
+              onClick={handleLogout}
+              className="bg-[#BF1363] px-3 py-1 rounded hover:bg-pink-700 transition"
             >
               Logout
             </button>
+
           </div>
         ) : (
-          <Link to="/register">
-            <div style={profileIcon}>👤</div>
+          <Link to="/login">
+            <div className="w-10 h-10 rounded-full bg-[#BF1363] flex items-center justify-center cursor-pointer hover:scale-105 transition">
+              👤
+            </div>
           </Link>
         )}
+
       </div>
     </div>
   );
 }
-
-/* STYLES */
-
-const linkStyle = {
-  color: "white",
-  textDecoration: "none",
-};
-
-const profileIcon = {
-  width: "40px",
-  height: "40px",
-  borderRadius: "50%",
-  background: "#BF1363",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  color: "white",
-  cursor: "pointer",
-};
-
-const logoutBtn = {
-  background: "#BF1363",
-  color: "white",
-  border: "none",
-  padding: "6px 12px",
-  borderRadius: "6px",
-  cursor: "pointer",
-};
 
 export default Navbar;

@@ -1,385 +1,261 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useFormik } from "formik";
+import * as Yup from "yup";
+import axios from "axios";
+
 import mykonosImg from "../assets/mykonos.jpg";
 import rioImg from "../assets/rio.jpg";
 
 function Home() {
   const navigate = useNavigate();
-
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const [search, setSearch] = useState({
-    location: "",
-    checkIn: "",
-    checkOut: "",
-    guests: "",
-  });
+  const [hotels, setHotels] = useState([]);
 
   const today = new Date().toISOString().split("T")[0];
 
-  const handleSearch = () => {
-    if (
-      !search.location.trim() ||
-      !search.checkIn ||
-      !search.checkOut ||
-      !search.guests.trim()
-    ) {
-      alert("Please fill all fields");
-      return;
+  // ✅ FETCH HOTELS
+  useEffect(() => {
+    fetchHotels();
+  }, []);
+
+  const fetchHotels = async () => {
+    try {
+      const res = await axios.get("http://127.0.0.1:5000/api/hotels");
+      setHotels(res.data);
+    } catch (err) {
+      console.log(err);
     }
-
-    if (search.checkIn < today) {
-      alert("Check-in date cannot be in the past");
-      return;
-    }
-
-    if (search.checkOut <= search.checkIn) {
-      alert("Check-out must be after check-in");
-      return;
-    }
-
-    if (isNaN(search.guests) || Number(search.guests) <= 0) {
-      alert("Guests must be a valid number");
-      return;
-    }
-
-    setLoading(true);
-
-    setTimeout(() => {
-      setLoading(false);
-    navigate("/rooms", { state: search });
-    }, 1500);
   };
 
+  // ✅ FIX IMAGE URL
+  const getImage = (img) => {
+    if (!img) return rioImg;
+
+    if (img.startsWith("http")) return img;
+
+    return `http://127.0.0.1:5000/${img}`;
+  };
+
+  const formik = useFormik({
+    initialValues: {
+      location: "",
+      checkIn: "",
+      checkOut: "",
+      guests: "",
+      petFriendly: false
+    },
+
+    validationSchema: Yup.object({
+      location: Yup.string().required("Location is required"),
+      checkIn: Yup.date().required().min(today, "No past dates"),
+      checkOut: Yup.date().required().min(Yup.ref("checkIn"), "Invalid date"),
+      guests: Yup.number().required().min(1, "At least 1 guest")
+    }),
+
+    onSubmit: (values) => {
+      setError("");
+      setLoading(true);
+
+      setTimeout(() => {
+        let results = hotels.filter((h) =>
+          h.location.toLowerCase().includes(values.location.toLowerCase().trim())
+        );
+
+        setLoading(false);
+
+        if (results.length === 0) {
+          setError("No stays found for this search");
+          return;
+        }
+
+        navigate("/rooms", {
+          state: { results, search: values }
+        });
+
+      }, 500);
+    }
+  });
+
   return (
-    <div style={{ background: "#F5F5F5", minHeight: "100vh" }}>
+    <div className="bg-gray-100 min-h-screen">
 
       {/* HERO */}
       <div
-        style={{
-          height: "400px",
-          backgroundImage: `url(${rioImg})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          position: "relative",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          color: "white",
-        }}
+        className="h-[350px] md:h-[450px] bg-cover bg-center relative flex items-center justify-center text-white"
+        style={{ backgroundImage: `url(${rioImg})` }}
       >
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            background: "rgba(0,0,0,0.4)",
-          }}
-        ></div>
+        <div className="absolute inset-0 bg-black/40"></div>
 
-        <div style={{ position: "relative", textAlign: "center" }}>
-          <h1 style={{ fontSize: "45px", marginBottom: "10px" }}>
+        <div className="relative text-center px-4">
+          <h1 className="text-3xl md:text-5xl font-bold">
             Find your perfect stay
           </h1>
-          <p>Discover amazing places around the world</p>
+          <p className="mt-2">Discover amazing places around the world</p>
         </div>
       </div>
 
       {/* SEARCH */}
-      <div style={searchWrapper}>
-        <div style={searchBox}>
+      <form onSubmit={formik.handleSubmit} className="flex justify-center mt-6 px-4">
+        <div className="bg-white p-5 rounded-xl shadow-lg flex flex-wrap gap-3 justify-center max-w-5xl w-full">
+
           <input
+            name="location"
             placeholder="Where are you going?"
-            value={search.location}
-            onChange={(e) =>
-              setSearch({ ...search, location: e.target.value })
-            }
-            style={inputStyle}
+            onChange={formik.handleChange}
+            value={formik.values.location}
+            className="border p-2 rounded"
           />
 
           <input
             type="date"
+            name="checkIn"
             min={today}
-            value={search.checkIn}
-            onChange={(e) =>
-              setSearch({ ...search, checkIn: e.target.value })
-            }
-            style={inputStyle}
+            onChange={formik.handleChange}
+            value={formik.values.checkIn}
+            className="border p-2 rounded"
           />
 
           <input
             type="date"
-            min={search.checkIn || today}
-            value={search.checkOut}
-            onChange={(e) =>
-              setSearch({ ...search, checkOut: e.target.value })
-            }
-            style={inputStyle}
+            name="checkOut"
+            min={formik.values.checkIn || today}
+            onChange={formik.handleChange}
+            value={formik.values.checkOut}
+            className="border p-2 rounded"
           />
 
           <input
             type="number"
+            name="guests"
+            min="1"
             placeholder="Guests"
-            value={search.guests}
-            onChange={(e) =>
-              setSearch({ ...search, guests: e.target.value })
-            }
-            style={inputStyle}
+            onChange={formik.handleChange}
+            value={formik.values.guests}
+            className="border p-2 rounded w-[100px]"
           />
 
-          <button onClick={handleSearch} style={buttonStyle}>
-            {loading ? "Loading..." : "Search"}
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              name="petFriendly"
+              onChange={formik.handleChange}
+              checked={formik.values.petFriendly}
+            />
+            Pet Friendly
+          </label>
+
+          <button className="bg-pink-600 text-white px-4 py-2 rounded">
+            {loading ? "Searching..." : "Search"}
           </button>
         </div>
+      </form>
+
+      {/* ERRORS */}
+      <div className="text-center text-red-500 mt-2">
+        {formik.errors.location ||
+          formik.errors.checkIn ||
+          formik.errors.checkOut ||
+          formik.errors.guests ||
+          error}
       </div>
 
       {/* DESTINATIONS */}
-      <div style={section}>
-        <h2 style={title}>Popular Destinations</h2>
-
-        <div style={gridBig}>
-          <Card title="Mykonos" img={mykonosImg} showButton={false} />
-          <Card title="Rio de Janeiro" img={rioImg} showButton={false} />
-          <Card
-            title="Paris"
-            img="https://images.unsplash.com/photo-1502602898657-3e91760cbb34"
-            showButton={false}
-          />
-        </div>
-      </div>
+      <Section title="Popular Destinations">
+        <Card title="Mykonos" img={mykonosImg} />
+        <Card title="Rio" img={rioImg} />
+        <Card title="Paris" img={rioImg} />
+      </Section>
 
       {/* WHY */}
-      <div style={whySection}>
-        <h2 style={whyTitle}>Why choose ROOMEO?</h2>
+      <div className="bg-white py-12 text-center">
+        <h2 className="text-2xl font-bold text-blue-800 mb-6">
+          Why choose ROOMEO?
+        </h2>
 
-        <div style={whyGrid}>
-          <WhyCard
-            icon="💰"
-            title="Best Prices"
-            text="Find the best deals worldwide"
-          />
-          <WhyCard
-            icon="🔒"
-            title="Secure Booking"
-            text="Safe and fast reservations"
-          />
-          <WhyCard
-            icon="💬"
-            title="24/7 Support"
-            text="We are here anytime"
-          />
+        <div className="flex flex-wrap justify-center gap-6">
+          <WhyCard icon="💰" title="Best Prices" />
+          <WhyCard icon="🔒" title="Secure Booking" />
+          <WhyCard icon="💬" title="24/7 Support" />
         </div>
       </div>
 
-      {/* FEATURED STAYS */}
-      <div style={section}>
-        <h2 style={title}>Featured Stays</h2>
-
-        <div style={gridBig}>
+      {/* FEATURED (FIXED IMAGES) */}
+      <Section title="Featured Stays">
+        {hotels.slice(0, 3).map((hotel) => (
           <Card
-            title="Beach Resort"
-            img="https://images.unsplash.com/photo-1507525428034-b723cf961d3e"
-            showButton={true}
+            key={hotel._id}
+            title={hotel.title}
+            img={getImage(hotel.image)} // ✅ FIXED
+            showButton
+            hotel={hotel}
           />
-          <Card
-            title="Luxury Hotel"
-            img="https://images.unsplash.com/photo-1566073771259-6a8506099945"
-            showButton={true}
-          />
-          <Card
-            title="Yoga Retreat"
-            img="https://images.unsplash.com/photo-1506126613408-eca07ce68773"
-            showButton={true}
-          />
-        </div>
-      </div>
+        ))}
+      </Section>
 
     </div>
   );
 }
 
+/* SECTION */
+function Section({ title, children }) {
+  return (
+    <div className="p-10 text-center">
+      <h2 className="text-xl font-bold text-blue-800">{title}</h2>
+      <div className="flex flex-wrap justify-center gap-6 mt-6">
+        {children}
+      </div>
+    </div>
+  );
+}
+
 /* CARD */
-function Card({ title, img, showButton }) {
+function Card({ title, img, showButton, hotel }) {
+  const navigate = useNavigate();
+
+  const handleClick = () => {
+    if (!showButton) return;
+
+    navigate(`/hotel/${hotel._id}`);
+  };
+
   return (
     <div
-      style={cardBig}
-      onMouseEnter={(e) =>
-        (e.currentTarget.style.transform = "scale(1.05)")
-      }
-      onMouseLeave={(e) =>
-        (e.currentTarget.style.transform = "scale(1)")
-      }
+      onClick={handleClick}
+      className="w-[300px] h-[200px] rounded-xl overflow-hidden relative shadow-lg 
+      transform transition duration-300 hover:scale-105 cursor-pointer"
     >
-      <img src={img} style={imageBig} />
+      <img src={img} className="w-full h-full object-cover" />
 
-      <div style={overlay}>
+      <div className="absolute bottom-0 w-full p-3 text-white font-bold bg-gradient-to-t from-black/70 to-transparent">
         {title}
 
         {showButton && (
-          <>
-            <br />
-            <button
-              onClick={() => navigate("/hotel")}
-              style={{
-                marginTop: "8px",
-                background: "#BF1363",
-                color: "white",
-                border: "none",
-                padding: "6px 12px",
-                borderRadius: "6px",
-                cursor: "pointer",
-              }}
-            >
-              View Details
-            </button>
-          </>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleClick();
+            }}
+            className="mt-2 bg-pink-600 px-3 py-1 rounded"
+          >
+            View Details
+          </button>
         )}
       </div>
     </div>
   );
 }
 
-/* WHY CARD */
-function WhyCard({ icon, title, text }) {
+/* WHY */
+function WhyCard({ icon, title }) {
   return (
-    <div style={whyCard}>
-      <div style={iconStyle}>{icon}</div>
-      <h3 style={whyHeading}>{title}</h3>
-      <p style={whyText}>{text}</p>
+    <div className="bg-gray-100 p-6 rounded-xl w-[200px]">
+      <div className="text-2xl">{icon}</div>
+      <h3 className="mt-2 font-bold">{title}</h3>
     </div>
   );
 }
-
-/* STYLES */
-
-const searchWrapper = {
-  display: "flex",
-  justifyContent: "center",
-  marginTop: "-60px",
-  position: "relative",
-  zIndex: 10,
-};
-
-const searchBox = {
-  background: "white",
-  padding: "20px",
-  borderRadius: "12px",
-  boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
-  display: "flex",
-  gap: "10px",
-  flexWrap: "wrap",
-};
-
-const inputStyle = {
-  padding: "10px",
-  borderRadius: "6px",
-  border: "1px solid #ccc",
-};
-
-const buttonStyle = {
-  background: "#BF1363",
-  color: "white",
-  border: "none",
-  padding: "10px 20px",
-  borderRadius: "6px",
-  cursor: "pointer",
-};
-
-const section = {
-  padding: "50px",
-  textAlign: "center",
-};
-
-const title = {
-  fontSize: "24px",
-  color: "#4E598C",
-};
-
-const gridBig = {
-  display: "flex",
-  justifyContent: "center",
-  gap: "30px",
-  marginTop: "25px",
-  flexWrap: "wrap",
-};
-
-const cardBig = {
-  width: "300px",
-  height: "200px",
-  borderRadius: "15px",
-  overflow: "hidden",
-  position: "relative",
-  cursor: "pointer",
-  boxShadow: "0 8px 20px rgba(0,0,0,0.2)",
-  transition: "0.3s",
-};
-
-const imageBig = {
-  width: "100%",
-  height: "100%",
-  objectFit: "cover",
-};
-
-const overlay = {
-  position: "absolute",
-  bottom: "0",
-  width: "100%",
-  padding: "15px",
-  color: "white",
-  fontWeight: "bold",
-  fontSize: "18px",
-  background: "linear-gradient(to top, rgba(0,0,0,0.7), transparent)",
-};
-
-const whySection = {
-  background: "white",
-  padding: "80px 20px",
-  textAlign: "center",
-};
-
-const whyTitle = {
-  fontSize: "28px",
-  color: "#4E598C",
-  marginBottom: "40px",
-};
-
-const whyGrid = {
-  display: "flex",
-  justifyContent: "center",
-  gap: "60px",
-  flexWrap: "wrap",
-};
-
-const whyCard = {
-  width: "220px",
-  padding: "25px",
-  borderRadius: "15px",
-  background: "#F5F5F5",
-  boxShadow: "0 6px 15px rgba(0,0,0,0.1)",
-};
-
-const whyHeading = {
-  fontSize: "20px",
-  fontWeight: "bold",
-  marginTop: "10px",
-  color: "#4E598C",
-};
-
-const whyText = {
-  color: "gray",
-  marginTop: "8px",
-};
-
-const iconStyle = {
-  fontSize: "28px",
-  background: "#BF1363",
-  color: "white",
-  width: "50px",
-  height: "50px",
-  borderRadius: "50%",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  margin: "0 auto",
-};
 
 export default Home;

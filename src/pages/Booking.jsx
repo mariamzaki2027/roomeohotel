@@ -1,242 +1,265 @@
-const savedHotel = JSON.parse(localStorage.getItem("selectedHotel"));
-import franceImg from "../assets/france.jpg";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { Formik, Form, Field, ErrorMessage } from "formik";
+import * as Yup from "yup";
+import axios from "axios";
 
 function Booking() {
-  const [form, setForm] = useState({
-    name: "",
-    checkIn: "",
-    checkOut: "",
-    rooms: 1,
-    guests: 1,
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const hotel = location.state?.hotel || location.state;
+  const token = localStorage.getItem("userToken");
+
+  const [loading, setLoading] = useState(false);
+
+  // ✅ AUTH GUARD
+  useEffect(() => {
+    if (!token) {
+      navigate("/login");
+    }
+  }, [token, navigate]);
+
+  // ❗ NO HOTEL
+  if (!hotel) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex justify-center items-center px-4">
+        <div className="bg-white shadow-xl rounded-2xl p-8 max-w-md w-full text-center">
+          <h2 className="text-2xl font-bold text-red-500 mb-4">
+            No Hotel Selected
+          </h2>
+
+          <p className="text-gray-600 mb-6">
+            Please choose a hotel first.
+          </p>
+
+          <button
+            onClick={() => navigate("/")}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg w-full"
+          >
+            Back Home
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const pricePerNight = hotel.price || 120;
+
+  // 🔥 IMAGE FIX
+  const getImage = (img) => {
+    if (!img) return "/hotel.jpg";
+    if (img.startsWith("http")) return img;
+    return `http://127.0.0.1:5000/${img}`;
+  };
+
+  const validationSchema = Yup.object({
+    checkIn: Yup.date().required("Check-in is required"),
+    checkOut: Yup.date()
+      .required("Check-out is required")
+      .test(
+        "after-checkin",
+        "Check-out must be after check-in",
+        function (value) {
+          const { checkIn } = this.parent;
+          if (!checkIn || !value) return false;
+          return new Date(value) > new Date(checkIn);
+        }
+      ),
+    rooms: Yup.number().min(1).required("Rooms required"),
+    guests: Yup.number().min(1).required("Guests required"),
   });
 
-  const [errors, setErrors] = useState({});
-  const [totalPrice, setTotalPrice] = useState(0);
-
-const pricePerNight = savedHotel?.price || 120;
-
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
-
-  const validate = () => {
-    const err = {};
-
-    if (!form.name) err.name = "Name is required";
-    if (!form.checkIn) err.checkIn = "Check-in is required";
-    if (!form.checkOut) err.checkOut = "Check-out is required";
-
-    if (form.checkIn && form.checkOut && form.checkOut <= form.checkIn) {
-      err.checkOut = "Check-out must be after check-in";
-    }
-
-    if (form.rooms < 1) err.rooms = "At least 1 room required";
-    if (form.guests < 1) err.guests = "At least 1 guest required";
-
-    return err;
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const err = validate();
-    setErrors(err);
-
-    if (Object.keys(err).length === 0) {
-      const days =
-        (new Date(form.checkOut) - new Date(form.checkIn)) /
-        (1000 * 60 * 60 * 24);
-
-      const total = days * pricePerNight * form.rooms;
-
-      setTotalPrice(total);
-
-      alert("Booking successful 🎉");
-    }
+  const calculateNights = (checkIn, checkOut) => {
+    if (!checkIn || !checkOut) return 0;
+    const diff = new Date(checkOut) - new Date(checkIn);
+    return diff / (1000 * 60 * 60 * 24);
   };
 
   return (
-    <div style={containerStyle}>
-      <div style={cardStyle}>
-        
-        {/* HOTEL INFO */}
-        <div style={formContainerStyle}>
-          <h2 style={titleStyle}>{savedHotel?.title || "Hotel"}</h2>
+    <div className="min-h-screen bg-gray-100 py-10 px-4">
+      <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
 
-          <img
- src={savedHotel?.image}
-  alt="Hotel"
-            style={{
-              width: "100%",
-              height: "220px",
-              objectFit: "cover",
-              borderRadius: "12px",
-              marginBottom: "15px",
-            }}
-          />
+        {/* ✅ FIXED IMAGE */}
+        <img
+          src={getImage(hotel.image)}
+          alt={hotel.title}
+          className="w-full h-72 object-cover"
+        />
 
-          <p style={{ textAlign: "center", marginBottom: "20px" }}>
-            💰 ${pricePerNight} / night
+        <div className="p-6 md:p-8">
+
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">
+            {hotel.title}
+          </h1>
+
+          <p className="text-pink-600 text-xl font-semibold mb-8">
+            ${pricePerNight} / night
           </p>
 
-          {/* FORM */}
-          <form onSubmit={handleSubmit}>
+          <Formik
+            initialValues={{
+              checkIn: "",
+              checkOut: "",
+              rooms: 1,
+              guests: 1,
+            }}
+            validationSchema={validationSchema}
+            onSubmit={async (values, { resetForm }) => {
+              const nights = calculateNights(
+                values.checkIn,
+                values.checkOut
+              );
 
-            {/* NAME */}
-            <div>
-              <label style={labelStyle}>Your Name</label>
-              <input
-                name="name"
-                placeholder="Enter your name"
-                value={form.name}
-                onChange={handleChange}
-                style={inputStyle}
-              />
-              {errors.name && <p style={errorStyle}>{errors.name}</p>}
-            </div>
+              const totalPrice =
+                nights * pricePerNight * values.rooms;
 
-            {/* CHECK-IN */}
-            <div>
-              <label style={labelStyle}>Check-in</label>
-              <input
-                type="date"
-                name="checkIn"
-                value={form.checkIn}
-                onChange={handleChange}
-                style={inputStyle}
-              />
-              {errors.checkIn && <p style={errorStyle}>{errors.checkIn}</p>}
-            </div>
+              try {
+                setLoading(true);
 
-            {/* CHECK-OUT */}
-            <div>
-              <label style={labelStyle}>Check-out</label>
-              <input
-                type="date"
-                name="checkOut"
-                value={form.checkOut}
-                onChange={handleChange}
-                style={inputStyle}
-              />
-              {errors.checkOut && <p style={errorStyle}>{errors.checkOut}</p>}
-            </div>
+                await axios.post(
+                  "http://127.0.0.1:5000/api/bookings",
+                  {
+                    hotelId: hotel._id,
+                    checkin: values.checkIn,     // ✅ FIXED
+                    checkout: values.checkOut,   // ✅ FIXED
+                    guests: values.guests,
+                    rooms: values.rooms,
+                    totalPrice,
+                    status: "confirmed",
+                  },
+                  {
+                    headers: {
+                      Authorization: `Bearer ${token}`,
+                    },
+                  }
+                );
 
-            {/* ROOMS & GUESTS */}
-            <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
-              <div style={{ flex: 1 }}>
-                <label style={labelStyle}>Rooms</label>
-                <input
-                  type="number"
-                  name="rooms"
-                  min="1"
-                  value={form.rooms}
-                  onChange={handleChange}
-                  style={inputStyle}
-                />
-                {errors.rooms && <p style={errorStyle}>{errors.rooms}</p>}
-              </div>
+                alert("Booking successful 🎉");
 
-              <div style={{ flex: 1 }}>
-                <label style={labelStyle}>Guests</label>
-                <input
-                  type="number"
-                  name="guests"
-                  min="1"
-                  value={form.guests}
-                  onChange={handleChange}
-                  style={inputStyle}
-                />
-                {errors.guests && <p style={errorStyle}>{errors.guests}</p>}
-              </div>
-            </div>
+                resetForm();
+                navigate("/");
 
-            {/* BUTTON */}
-            <button type="submit" style={buttonStyle}>
-              Confirm & Pay
-            </button>
-          </form>
+              } catch (error) {
+                console.log(error.response?.data); // 👈 VERY IMPORTANT
+                alert(
+                  error.response?.data?.message ||
+                  "Booking failed ❌"
+                );
+              } finally {
+                setLoading(false);
+              }
+            }}
+          >
+            {({ values }) => {
+              const nights = calculateNights(
+                values.checkIn,
+                values.checkOut
+              );
 
-          {/* TOTAL */}
-          {totalPrice > 0 && (
-            <div style={totalStyle}>
-              Total Price: ${totalPrice} 
-            </div>
-          )}
+              const totalPrice =
+                nights * pricePerNight * values.rooms;
+
+              return (
+                <Form className="space-y-5">
+
+                  {/* DATES */}
+                  <div className="grid md:grid-cols-2 gap-5">
+
+                    <div>
+                      <label className="block mb-1 font-medium">
+                        Check In
+                      </label>
+
+                      <Field
+                        type="date"
+                        name="checkIn"
+                        className="w-full border p-3 rounded-lg"
+                      />
+
+                      <ErrorMessage
+                        name="checkIn"
+                        component="p"
+                        className="text-red-500 text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block mb-1 font-medium">
+                        Check Out
+                      </label>
+
+                      <Field
+                        type="date"
+                        name="checkOut"
+                        className="w-full border p-3 rounded-lg"
+                      />
+
+                      <ErrorMessage
+                        name="checkOut"
+                        component="p"
+                        className="text-red-500 text-sm"
+                      />
+                    </div>
+
+                  </div>
+
+                  {/* ROOMS + GUESTS */}
+                  <div className="grid md:grid-cols-2 gap-5">
+
+                    <div>
+                      <label className="block mb-1 font-medium">
+                        Rooms
+                      </label>
+
+                      <Field
+                        type="number"
+                        name="rooms"
+                        min="1"
+                        className="w-full border p-3 rounded-lg"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block mb-1 font-medium">
+                        Guests
+                      </label>
+
+                      <Field
+                        type="number"
+                        name="guests"
+                        min="1"
+                        className="w-full border p-3 rounded-lg"
+                      />
+                    </div>
+
+                  </div>
+
+                  {/* TOTAL */}
+                  {totalPrice > 0 && (
+                    <div className="bg-green-100 p-3 rounded text-center font-bold">
+                      Total Price: ${totalPrice}
+                    </div>
+                  )}
+
+                  {/* BUTTON */}
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-pink-600 text-white py-3 rounded-lg"
+                  >
+                    {loading ? "Processing..." : "Confirm Booking"}
+                  </button>
+
+                </Form>
+              );
+            }}
+          </Formik>
+
         </div>
       </div>
     </div>
   );
 }
-
-/* STYLES */
-
-const containerStyle = {
-  minHeight: "100vh",
-  backgroundColor: "#F5F5F5",
-  display: "flex",
-  justifyContent: "center",
-  alignItems: "center",
-  padding: "20px",
-  fontFamily: "Arial",
-};
-
-const cardStyle = {
-  maxWidth: "700px",
-  width: "100%",
-  backgroundColor: "white",
-  borderRadius: "20px",
-  boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
-};
-
-const formContainerStyle = {
-  padding: "30px",
-};
-
-const titleStyle = {
-  fontSize: "28px",
-  fontWeight: "bold",
-  color: "#4E598C",
-  marginBottom: "15px",
-  textAlign: "center",
-};
-
-const inputStyle = {
-  width: "100%",
-  padding: "10px",
-  borderRadius: "10px",
-  border: "1px solid #ccc",
-  marginTop: "5px",
-  marginBottom: "10px",
-};
-
-const labelStyle = {
-  fontWeight: "bold",
-};
-
-const buttonStyle = {
-  width: "100%",
-  padding: "12px",
-  backgroundColor: "#BF1363",
-  color: "white",
-  border: "none",
-  borderRadius: "10px",
-  fontWeight: "bold",
-  marginTop: "10px",
-  cursor: "pointer",
-};
-
-const errorStyle = {
-  color: "red",
-  fontSize: "12px",
-};
-
-const totalStyle = {
-  marginTop: "20px",
-  padding: "12px",
-  backgroundColor: "#D1FAE5",
-  borderRadius: "10px",
-  textAlign: "center",
-  fontWeight: "bold",
-};
 
 export default Booking;

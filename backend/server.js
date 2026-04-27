@@ -7,16 +7,21 @@ const cors = require("cors");
 const authRoutes = require("./routes/authRoutes");
 const hotelRoutes = require("./routes/hotelRoutes");
 const bookingRoutes = require("./routes/bookingRoutes");
+const roomRoutes = require("./routes/roomRoutes");
 require("dotenv").config();
 
 const app = express();
 
 /* Middleware */
-app.use(cors());
+app.use(cors({
+  origin: "http://localhost:5173",
+  credentials: true
+}));
 app.use(express.json());
-app.use("/api", authRoutes);
-app.use("/api", bookingRoutes);
-app.use("/api", hotelRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/bookings", bookingRoutes);
+app.use("/api/hotels", hotelRoutes);
+app.use("/api/rooms", roomRoutes);
 /* Test Route */
 app.get("/", (req, res) => {
   res.send("ROOMEO Backend Running");
@@ -38,3 +43,5 @@ mongoose
     console.log("Connection Failed ❌");
     console.log(err);
   });
+
+  

@@ -20,6 +20,8 @@ function App() {
 <Route path="/login" element={<Login />} />
 <Route path="/booking" element={<Booking />} />
 <Route path="/rooms" element={<Rooms />} />
+
+
       </Routes>
 
       <Footer />

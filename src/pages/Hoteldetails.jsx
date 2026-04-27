@@ -1,86 +1,63 @@
-import React, { useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 function Hoteldetails() {
-  const [name, setName] = useState("");
-  const [checkin, setCheckin] = useState("");
-  const [checkout, setCheckout] = useState("");
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  const hotel = {
-    title: "Luxury Hotel",
-    location: "Cairo",
-    price: 1200,
-    image: "https://images.unsplash.com/photo-1566073771259-6a8506099945"
-  };
+  const hotel = location.state?.hotel;
 
-  function handleBooking() {
-    if (!name || !checkin || !checkout) {
-      alert("Please fill all fields ❗");
-      return;
-    }
-
-    const days =
-      (new Date(checkout) - new Date(checkin)) /
-      (1000 * 60 * 60 * 24);
-
-    const totalPrice = days * hotel.price;
-
-    const booking = {
-      name,
-      hotel: hotel.title,
-      price: hotel.price,
-      checkin,
-      checkout,
-      totalPrice
-    };
-
-    const bookings =
-      JSON.parse(localStorage.getItem("bookings")) || [];
-
-    bookings.push(booking);
-
-    localStorage.setItem("bookings", JSON.stringify(bookings));
-
-    alert("Booking Confirmed ✅");
+  if (!hotel) {
+    return (
+      <div className="text-center mt-20">
+        <p>No hotel selected ❗</p>
+        <button
+          onClick={() => navigate("/")}
+          className="mt-4 bg-blue-600 text-white px-4 py-2 rounded"
+        >
+          Go Home
+        </button>
+      </div>
+    );
   }
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h1>{hotel.title}</h1>
+    <div className="min-h-screen bg-gray-100 flex justify-center items-center p-6">
 
-      <img
-        src={hotel.image}
-        alt="hotel"
-        style={{ width: "300px", borderRadius: "10px" }}
-      />
+      <div className="bg-white rounded-2xl shadow-lg max-w-xl w-full p-6">
 
-      <p>📍 {hotel.location}</p>
-      <p>💰 {hotel.price} EGP / night</p>
+        {/* IMAGE */}
+        <img
+          src={hotel.image}
+          alt="hotel"
+          className="w-full h-60 object-cover rounded-xl"
+        />
 
-      <h3>Book Now</h3>
+        {/* INFO */}
+        <h1 className="text-2xl font-bold mt-4">
+          {hotel.title || hotel.name}
+        </h1>
 
-      <input
-        placeholder="Your Name"
-        onChange={(e) => setName(e.target.value)}
-      />
-      <br /><br />
+        <p className="text-gray-500 mt-2">
+          📍 {hotel.location}
+        </p>
 
-      <label>Check-in</label><br />
-      <input
-        type="date"
-        onChange={(e) => setCheckin(e.target.value)}
-      />
-      <br /><br />
+        <p className="text-green-600 font-bold mt-2">
+          💰 {hotel.price} EGP / night
+        </p>
 
-      <label>Check-out</label><br />
-      <input
-        type="date"
-        onChange={(e) => setCheckout(e.target.value)}
-      />
-      <br /><br />
+        {/* BUTTON ONLY */}
+        <button
+          onClick={() =>
+            navigate("/booking", {
+              state: { hotel }
+            })
+          }
+          className="w-full mt-6 bg-pink-600 text-white py-3 rounded-lg hover:bg-pink-700 transition"
+        >
+          Book Now
+        </button>
 
-      <button onClick={handleBooking}>
-        Book Now
-      </button>
+      </div>
     </div>
   );
 }
